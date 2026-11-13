@@ -1,0 +1,20 @@
+# Credenciais e configuração local: nunca versionar
+inc/config.php
+
+# Lixo de sistema / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+assets/.t
+*.log
+
+# Arquivos enviados pelas tarefas: ficam só no servidor (a pasta e o .htaccess são versionados)
+uploads/*
+!uploads/.htaccess
+!uploads/.gitkeep
+
+# Backups e copias de seguranca locais: nunca versionar
+_backup_*.sql
+*.bak
+*.bak-*

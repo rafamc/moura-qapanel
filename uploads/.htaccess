@@ -1,0 +1,8 @@
+# Nada desta pasta é servido direto pela web: os arquivos só saem por anexo.php, com login.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Deny from all
+</IfModule>
+Options -Indexes

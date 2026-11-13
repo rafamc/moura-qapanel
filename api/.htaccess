@@ -1,0 +1,3 @@
+# Garante que o header Authorization chegue ao PHP (Apache + FastCGI/Hostinger)
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

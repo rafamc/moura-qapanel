@@ -1,0 +1,3 @@
+O schema.sql da raiz é a verdade: ele já traz tudo.
+Mudança de banco daqui para frente: crie NNN_descricao.sql aqui (001, 002...), rode no phpMyAdmin
+ANTES de publicar o código que depende dela, e atualize o schema.sql no mesmo commit.

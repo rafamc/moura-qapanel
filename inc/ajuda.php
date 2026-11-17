@@ -5,6 +5,7 @@ return [
     'chave'         => 'Serve para provar que você é o dono do servidor. É a senha do banco de dados (ou o api_token) que está no arquivo config.php.',
     'login'         => 'O seu e-mail e uma senha só sua. Se esquecer, a gestão cria uma nova em um minuto.',
     'link_pessoal'  => 'Acesso antigo por link. Continua funcionando, mas o jeito principal agora é e-mail e senha.',
+    'relatar'       => 'Conte um bug, um ajuste ou uma dúvida. Vira uma tarefa com prazo de resposta. Dá para colar um print de tela com Ctrl+V.',
     'para_mim'      => 'Aqui ficam só as tarefas que ficaram com você nas conversas e reuniões. Terminou uma? Toque em "Feita".',
     'todas'         => 'Mostra as tarefas de todo mundo, para você saber o que cada pessoa ficou de fazer.',
     'tarefa'        => 'Tarefa é uma coisa combinada, com uma pessoa responsável e uma data.',

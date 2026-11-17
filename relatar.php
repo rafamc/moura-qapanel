@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 topo('Relatar um problema', 'relatar');
-echo '<div class="cab"><h1>Relatar um problema</h1></div>';
+echo '<div class="cab"><h1>Relatar um problema</h1>' . ajuda('relatar') . '</div>';
 echo '<p class="sub">Achou um bug, quer um ajuste ou tem uma dúvida? Conte aqui. Vira uma tarefa com prazo, e você acompanha até ficar resolvida.</p>';
 if ($erro) echo '<div class="aviso erro" role="alert">' . e($erro) . '</div>';
 echo '<div class="card"><form method="post" enctype="multipart/form-data" class="form-relato">' . csrf_campo();

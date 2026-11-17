@@ -128,7 +128,7 @@ function anexos_campo_html(): string {
         . '<label class="zona"><input type="file" name="anexos[]" multiple accept="' . e('.' . str_replace(',', ',.', $ext)) . '">'
         . '<span class="zona-mais" aria-hidden="true">+</span>'
         . '<strong>Toque aqui para escolher fotos e arquivos</strong>'
-        . '<span class="sm muted">Pode escolher vários de uma vez. No computador, também dá para arrastar para cá.</span></label>'
+        . '<span class="sm muted">Pode escolher vários de uma vez. No computador, dá para arrastar para cá ou colar um print com Ctrl+V.</span></label>'
         . '<ul class="previa" hidden></ul><p class="previa-msg" role="status" hidden></p>'
         . '<p class="sm muted" style="margin:6px 0 0">Até ' . ANEXO_MAX_POR_ENVIO . ' arquivos por envio, ' . (ANEXO_MAX_BYTES / 1048576) . ' MB cada. Fotos, PDF, Word, Excel, CSV, TXT e ZIP.</p></div>';
 }

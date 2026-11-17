@@ -308,3 +308,10 @@ body{background:
 .badge.bola{background:var(--surf-hi);color:var(--ink);border:1px solid var(--line-2)}
 .badge.bola-moura{background:var(--primary-soft);color:var(--primary)}
 .badge.bola-cliente{background:#fff0c9;color:#795900}
+
+/* Tela "Relatar problema" */
+.form-relato .linha-relato{display:grid;grid-template-columns:minmax(150px,210px) 1fr;gap:0 var(--sp-3)}
+.form-relato .opc{font-weight:400;color:var(--muted)}
+.form-relato textarea{min-height:140px}
+.form-relato .form-acoes .btn{width:auto;min-width:200px}
+@media (max-width:640px){.form-relato .linha-relato{grid-template-columns:1fr}.form-relato .form-acoes .btn{width:100%}}

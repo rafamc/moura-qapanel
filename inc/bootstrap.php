@@ -428,7 +428,7 @@ function topo(string $titulo, string $ativo = '', bool $menu = true): void {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="' . e(url('assets/painel.css')) . '?v=13">
-<link rel="stylesheet" href="' . e(url('assets/painel-v2.css')) . '?v=7">
+<link rel="stylesheet" href="' . e(url('assets/painel-v2.css')) . '?v=8">
 <style>:root{--primary:' . e($cor['primary']) . ';--primary-2:' . e($cor['primary2']) . ';--gold:' . e($cor['destaque']) . ';--primary-soft:color-mix(in srgb,' . e($cor['primary']) . ' 10%,#fff);--surf-low:color-mix(in srgb,' . e($cor['primary']) . ' 6%,#fff);--surf-hi:color-mix(in srgb,' . e($cor['primary']) . ' 12%,#fff);--bg:color-mix(in srgb,' . e($cor['primary']) . ' 8%,#eceef1)}</style>
 </head><body>
 <a class="skip" href="#conteudo">Ir para o conteúdo</a>
@@ -453,5 +453,5 @@ function topo(string $titulo, string $ativo = '', bool $menu = true): void {
 }
 function rodape(): void {
     echo '</main><footer class="wrap rodape"><strong>' . e(cliente()) . '</strong><br>Painel feito pela ' . e(gestor_empresa()) . (modulo('engajamento') ? '<br><span class="sm">' . e((string)opt('aviso_registro', 'Este painel registra acessos e ações nas tarefas para acompanhar o andamento do projeto.')) . '</span>' : '') . '</footer>
-<script src="' . e(url('assets/painel.js')) . '?v=3"></script><script src="' . e(url('assets/anexos.js')) . '?v=1"></script></body></html>';
+<script src="' . e(url('assets/painel.js')) . '?v=3"></script><script src="' . e(url('assets/anexos.js')) . '?v=2"></script></body></html>';
 }

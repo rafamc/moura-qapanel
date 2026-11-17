@@ -33,8 +33,12 @@ return [
         'historico'   => true,
         'guia'        => true,
         'arquivos'    => true,
+        'relatos'     => true,   // o cliente relata bug, ajuste ou dúvida (vira tarefa)
         'engajamento' => true,   // registro de uso, "A vez é de" e Desempacar (só o admin vê os números)
     ],
+
+    // Relatos do cliente: em quantos dias a gestão responde (prazo da tarefa criada). Padrão 3.
+    'relato_prazo_dias' => 3,
 
     // Transparência: aparece no rodapé enquanto o módulo "engajamento" estiver ligado. Combine o mesmo texto no contrato.
     'aviso_registro' => 'Este painel registra acessos e ações nas tarefas para acompanhar o andamento do projeto.',

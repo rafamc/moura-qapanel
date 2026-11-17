@@ -28,3 +28,7 @@ Com `engajamento` ligado, o rodapé mostra o aviso de registro (`aviso_registro`
 ## Ainda não existe
 - Endpoint de números agregados e anônimos para comparar clientes (desenhado, não construído).
 - Cada instalação é independente: correção de bug precisa ser aplicada em cada deploy (mesmo repositório, `git pull`).
+
+## Relatos do cliente (bug, ajuste, dúvida)
+
+O cliente tem a aba **Relatar problema** (`relatar.php`, módulo `relatos`). Cada relato vira uma tarefa: título com prefixo `[Bug]`, `[Ajuste]` ou `[Dúvida]`, responsável é o primeiro admin ativo, a bola começa com a gestão, e o prazo é de resposta (`relato_prazo_dias`, padrão 3). Quem relatou entra como participante, então acompanha, marca como feita ou reabre se o retesto falhar. Limite de 15 relatos por pessoa por hora. Não exige mudança no banco.

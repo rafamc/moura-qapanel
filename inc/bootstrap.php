@@ -413,8 +413,8 @@ function trecho(?string $md, int $max = 110): string {
 /* ---------- Layout ---------- */
 function topo(string $titulo, string $ativo = '', bool $menu = true): void {
     $p = pessoa_atual();
-    $abas = ['index' => 'Para mim', 'decidido' => 'Decidido', 'projeto' => 'Guia do projeto', 'reunioes' => 'Reuniões', 'historico' => 'Histórico', 'arquivos' => 'Arquivos'];
-    $deModulo = ['decidido' => 'decidido', 'projeto' => 'guia', 'reunioes' => 'reunioes', 'historico' => 'historico', 'arquivos' => 'arquivos'];
+    $abas = ['index' => 'Para mim', 'decidido' => 'Decidido', 'projeto' => 'Guia do projeto', 'reunioes' => 'Reuniões', 'historico' => 'Histórico', 'arquivos' => 'Arquivos', 'relatar' => 'Relatar problema'];
+    $deModulo = ['decidido' => 'decidido', 'projeto' => 'guia', 'reunioes' => 'reunioes', 'historico' => 'historico', 'arquivos' => 'arquivos', 'relatar' => 'relatos'];
     foreach ($deModulo as $aba => $m) if (!modulo($m)) unset($abas[$aba]);
     $cor = cores();
     $letra = mb_strtoupper(mb_substr((string)opt('marca', 'P'), 0, 1));

@@ -6,7 +6,7 @@ $eu = exigir_login();
 exigir_modulo('relatos');
 $pdo = db();
 
-const RELATO_TIPOS = ['bug' => 'Bug', 'ajuste' => 'Ajuste', 'duvida' => 'Dúvida'];
+const RELATO_TIPOS = ['bug' => 'Bug', 'ajuste' => 'Ajuste', 'sugestao' => 'Sugestão', 'duvida' => 'Dúvida'];
 $erro = ''; $v = ['tipo' => 'bug', 'titulo' => '', 'onde' => '', 'descricao' => ''];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -33,8 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $dias = max(1, (int)opt('relato_prazo_dias', 3));
                 $prazo = date('Y-m-d', strtotime("+$dias days"));
                 $desc = ($v['onde'] !== '' ? "Onde: " . $v['onde'] . "\n\n" : '') . $v['descricao'];
-                $pdo->prepare('INSERT INTO tarefas (titulo, descricao, responsavel_id, prazo) VALUES (?,?,?,?)')
-                    ->execute(['[' . RELATO_TIPOS[$v['tipo']] . '] ' . $v['titulo'], $desc, $adm, $prazo]);
+                if (recursos_novos()) { // o tipo vira etiqueta (coluna tipo); sem a migration, ele vai no título
+                    $pdo->prepare('INSERT INTO tarefas (titulo, tipo, descricao, responsavel_id, prazo) VALUES (?,?,?,?,?)')->execute([$v['titulo'], $v['tipo'], $desc, $adm, $prazo]);
+                } else {
+                    $pdo->prepare('INSERT INTO tarefas (titulo, descricao, responsavel_id, prazo) VALUES (?,?,?,?)')->execute(['[' . RELATO_TIPOS[$v['tipo']] . '] ' . $v['titulo'], $desc, $adm, $prazo]);
+                }
                 $id = (int)$pdo->lastInsertId();
                 if ((int)$eu['id'] !== $adm) salvar_equipe($id, $adm, [(int)$eu['id']], (int)$eu['id']); // quem relatou acompanha e pode confirmar ou reabrir
                 definir_bola($id, 'moura');

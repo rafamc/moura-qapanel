@@ -7,7 +7,7 @@ function admin_post(array $eu): void {
     if (!csrf_ok()) { aviso('Sessão expirada. Recarregue a página.', 'erro'); voltar(url('admin/')); }
     $a = (string)($_POST['a'] ?? '');
     $v = (string)($_POST['v'] ?? 'tarefas');
-    $f = in_array($_POST['f'] ?? '', ['abertas', 'atrasadas', 'travadas', 'concluidas', 'todas'], true) ? (string)$_POST['f'] : '';
+    $f = in_array($_POST['f'] ?? '', ['abertas', 'atrasadas', 'validacao', 'travadas', 'concluidas', 'todas'], true) ? (string)$_POST['f'] : '';
     $dest = url('admin/?v=' . urlencode($v) . ($f !== '' ? '&f=' . $f : ''));
     $data = fn($s) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$s) ? $s : null;
 
@@ -18,6 +18,7 @@ function admin_post(array $eu): void {
             $pdo->prepare('INSERT INTO tarefas (titulo, descricao, responsavel_id, prazo, reuniao_id) VALUES (?,?,?,?,?)')
                 ->execute([$titulo, trim((string)$_POST['descricao']) ?: null, $resp, $prazo, (int)($_POST['reuniao_id'] ?? 0) ?: null]);
             $novoId = (int)$pdo->lastInsertId();
+            if (recursos_novos() && isset(TIPOS[$_POST['tipo'] ?? ''])) $pdo->prepare('UPDATE tarefas SET tipo = ? WHERE id = ?')->execute([$_POST['tipo'], $novoId]);
             registrar($novoId, (int)$eu['id'], 'status', 'tarefa criada');
             evento('atribuida', $resp, $novoId, null, 0);
             salvar_equipe($novoId, $resp, $_POST['participantes'] ?? [], (int)$eu['id']);
@@ -32,9 +33,10 @@ function admin_post(array $eu): void {
                 ->execute([trim($_POST['titulo']), trim((string)$_POST['descricao']) ?: null, $resp, $prazo, (int)($_POST['reuniao_id'] ?? 0) ?: null, $id]);
             if ($resp !== $respAntes) evento('atribuida', $resp, $id, null, 0);
             salvar_equipe($id, $resp, $_POST['participantes'] ?? [], (int)$eu['id']);
+            if (recursos_novos() && isset(TIPOS[$_POST['tipo'] ?? ''])) $pdo->prepare('UPDATE tarefas SET tipo = ? WHERE id = ?')->execute([$_POST['tipo'], $id]);
             $novoSt = (string)($_POST['situacao'] ?? '');
             $atualSt = $pdo->prepare('SELECT status FROM tarefas WHERE id = ?'); $atualSt->execute([$id]);
-            if (in_array($novoSt, ['a_fazer', 'fazendo', 'feito', 'travado'], true) && $novoSt !== $atualSt->fetchColumn()) mudar_status($id, (int)$eu['id'], $novoSt);
+            if (in_array($novoSt, ['a_fazer', 'fazendo', 'feito', 'travado', 'validacao'], true) && $novoSt !== $atualSt->fetchColumn() && ($novoSt !== 'validacao' || recursos_novos())) mudar_status($id, (int)$eu['id'], $novoSt);
             if ($pdo->query('SELECT status FROM tarefas WHERE id = ' . $id)->fetchColumn() !== 'feito') {
                 if (in_array($_POST['bola'] ?? '', LADOS, true)) definir_bola($id, (string)$_POST['bola']);
                 elseif ($resp !== $respAntes) bola_pelo_responsavel($id);
@@ -85,17 +87,24 @@ function admin_post(array $eu): void {
             $em = email_ou_null($_POST['email'] ?? '');
             if ($em === false) { aviso('E-mail inválido.', 'erro'); break; }
             $senhaIni = (string)($_POST['senha'] ?? '');
+            $cel = trim((string)($_POST['celular'] ?? ''));
+            if ($cel !== '' && celular_wa($cel) === '') { aviso('Celular inválido. Use DDD + número, ex.: 48 99999-9999.', 'erro'); break; }
             if ($senhaIni !== '' && mb_strlen($senhaIni) < 4) { aviso('A senha precisa ter pelo menos 4 caracteres.', 'erro'); break; }
             try {
                 $pdo->prepare('INSERT INTO pessoas (nome, email, senha_hash, senha_provisoria, papel, lado, token) VALUES (?,?,?,?,?,?,?)')
                     ->execute([trim($_POST['nome']), $em, ($em && $senhaIni !== '') ? password_hash($senhaIni, PASSWORD_DEFAULT) : null, ($em && $senhaIni !== '') ? 1 : 0, trim((string)$_POST['papel']), $_POST['lado'] === 'moura' ? 'moura' : 'cliente', bin2hex(random_bytes(20))]);
+                $novaId = (int)$pdo->lastInsertId();
             } catch (PDOException $ex) { aviso('Esse e-mail já está em uso por outra pessoa.', 'erro'); break; }
+            if ($cel !== '' && recursos_novos()) $pdo->prepare('UPDATE pessoas SET celular = ? WHERE id = ?')->execute([$cel, $novaId]);
             aviso(!$em ? 'Pessoa criada. Falta o e-mail para ela poder entrar.' : ($senhaIni !== '' ? 'Pessoa criada. Ela já pode entrar com o e-mail e a senha que você definiu.' : 'Pessoa criada. Agora defina a senha.')); break;
         case 'pessoa_editar':
             $em = email_ou_null($_POST['email'] ?? '');
             if ($em === false) { aviso('E-mail inválido.', 'erro'); break; }
+            $cel = trim((string)($_POST['celular'] ?? ''));
+            if ($cel !== '' && celular_wa($cel) === '') { aviso('Celular inválido. Use DDD + número, ex.: 48 99999-9999.', 'erro'); break; }
             try {
                 $pdo->prepare('UPDATE pessoas SET nome=?, email=?, papel=? WHERE id=?')->execute([trim($_POST['nome']), $em, trim((string)$_POST['papel']), (int)$_POST['id']]);
+                if (recursos_novos() && isset($_POST['celular'])) $pdo->prepare('UPDATE pessoas SET celular = ? WHERE id = ?')->execute([$cel !== '' ? $cel : null, (int)$_POST['id']]);
             } catch (PDOException $ex) { aviso('Esse e-mail já está em uso por outra pessoa.', 'erro'); break; }
             aviso('Pessoa atualizada.'); break;
         case 'pessoa_senha_def':

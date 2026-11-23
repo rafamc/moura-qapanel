@@ -14,7 +14,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_ok()) resp_json(false, 'Sess�
 $id = (int)($_POST['tarefa_id'] ?? 0);
 $novo = (string)($_POST['status'] ?? '');
 $texto = trim((string)($_POST['texto'] ?? ''));
-if (!in_array($novo, ['a_fazer', 'fazendo', 'travado', 'feito'], true)) resp_json(false, 'Coluna inválida.', 422);
+if (!in_array($novo, ['a_fazer', 'fazendo', 'validacao', 'travado', 'feito'], true)) resp_json(false, 'Coluna inválida.', 422);
+if ($novo === 'validacao' && !recursos_novos()) resp_json(false, 'O banco ainda não tem o status Em validação (rodar migrations/001).', 500);
 
 $st = db()->prepare('SELECT * FROM tarefas WHERE id = ?');
 $st->execute([$id]);

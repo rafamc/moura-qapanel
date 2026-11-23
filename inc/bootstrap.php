@@ -189,7 +189,27 @@ function ajuda(string $chave): string {
 }
 
 /* ---------- Domínio ---------- */
-const STATUS = ['a_fazer' => 'A fazer', 'fazendo' => 'Fazendo', 'feito' => 'Feita', 'travado' => 'Travou'];
+const STATUS = ['a_fazer' => 'Aberto', 'fazendo' => 'Em execução', 'validacao' => 'Em validação', 'travado' => 'Travou', 'feito' => 'Concluído'];
+const TIPOS = ['tarefa' => 'Tarefa', 'bug' => 'Bug', 'sugestao' => 'Sugestão', 'duvida' => 'Dúvida', 'ajuste' => 'Ajuste'];
+/* Verbo que o cliente usa para validar, por tipo ("✓ Confirmo: foi corrigido"). */
+const VALIDAR_ROTULO = ['tarefa' => 'Validar', 'bug' => 'Confirmo: foi corrigido', 'sugestao' => 'Aprovo', 'duvida' => 'Entendi, resolvido', 'ajuste' => 'Ficou como pedi'];
+
+/** Migration 001 aplicada? (status Em validação, tipo, resultado e celular). Sem ela o painel segue no modelo antigo. */
+function recursos_novos(): bool {
+    static $ok = null;
+    if ($ok === null) { try { db()->query('SELECT tipo, resultado FROM tarefas LIMIT 1'); db()->query('SELECT celular FROM pessoas LIMIT 1'); $ok = true; } catch (Throwable $e) { $ok = false; } }
+    return $ok;
+}
+/** Nome da situação para mostrar: "Ignorado" quando foi concluída sem fazer. */
+function status_rotulo(array $t): string {
+    if (($t['status'] ?? '') === 'feito' && ($t['resultado'] ?? '') === 'ignorado') return 'Ignorado';
+    return STATUS[$t['status']] ?? (string)$t['status'];
+}
+function tipo_badge(array $t): string {
+    $k = (string)($t['tipo'] ?? 'tarefa');
+    if ($k === 'tarefa' || !isset(TIPOS[$k])) return '';
+    return '<span class="badge tipo tipo-' . e($k) . '">' . e(TIPOS[$k]) . '</span>';
+}
 
 function prazo_info(string $prazo, string $status): array {
     if ($status === 'feito') return ['', 'ok'];
@@ -262,15 +282,99 @@ function bola_badge(array $t): string {
     return '<span class="badge bola bola-' . e($t['bola_com']) . '">' . e($txt) . '</span>';
 }
 
-function mudar_status(int $tarefaId, int $pessoaId, string $novo, string $nota = ''): void {
+function mudar_status(int $tarefaId, int $pessoaId, string $novo, string $nota = '', ?string $rotulo = null): void {
     $pdo = db();
+    if ($novo === 'validacao' && !recursos_novos()) throw new RuntimeException('Falta rodar migrations/001_validacao_tipo_celular.sql');
     $pdo->prepare('UPDATE tarefas SET status = ?, concluida_em = ? WHERE id = ?')
         ->execute([$novo, $novo === 'feito' ? date('Y-m-d H:i:s') : null, $tarefaId]);
+    if (recursos_novos()) $pdo->prepare('UPDATE tarefas SET resultado = NULL WHERE id = ?')->execute([$tarefaId]); // reabrir ou concluir de novo limpa o "ignorado"
     if ($novo === 'feito') definir_bola($tarefaId, null);
+    elseif ($novo === 'validacao') definir_bola($tarefaId, 'cliente'); // quem pediu confere
     elseif ($novo === 'travado') bola_pelo_responsavel($tarefaId, true);
     else bola_pelo_responsavel($tarefaId);
-    $rot = ['feito' => 'marcou como feita', 'travado' => 'avisou que travou', 'a_fazer' => 'reabriu a tarefa', 'fazendo' => 'começou a fazer'][$novo];
+    $rot = $rotulo ?? ['feito' => 'concluiu', 'travado' => 'avisou que travou', 'a_fazer' => 'reabriu a tarefa', 'fazendo' => 'começou a executar', 'validacao' => 'enviou para validação'][$novo];
     registrar($tarefaId, $pessoaId, 'status', $rot . ($nota !== '' ? ': ' . $nota : ''));
+}
+/** O gestor decide não fazer (bug que não é bug, sugestão recusada). Fecha a tarefa como "Ignorado", com o motivo no histórico. */
+function ignorar_tarefa(int $tarefaId, int $pessoaId, string $motivo): void {
+    if (!recursos_novos()) throw new RuntimeException('Falta rodar migrations/001_validacao_tipo_celular.sql');
+    db()->prepare("UPDATE tarefas SET status = 'feito', resultado = 'ignorado', concluida_em = NOW() WHERE id = ?")->execute([$tarefaId]);
+    definir_bola($tarefaId, null);
+    registrar($tarefaId, $pessoaId, 'status', 'ignorou: ' . $motivo);
+}
+/** Alguém do lado do cliente participa da tarefa? Só então faz sentido pedir validação. */
+function tem_validador(array $t): bool {
+    $ids = array_map('intval', $t['equipe_ids'] ?? [(int)$t['responsavel_id']]);
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    $st = db()->prepare("SELECT 1 FROM pessoas WHERE lado = 'cliente' AND ativo = 1 AND id IN ($in) LIMIT 1");
+    $st->execute($ids);
+    return (bool)$st->fetchColumn();
+}
+
+/* ---------- Aviso por WhatsApp: botão wa.me (o gestor abre o app e envia; nada sai sozinho, sem custo) ---------- */
+function celular_wa(?string $c): string {
+    $d = preg_replace('/\D+/', '', (string)$c);
+    if ($d === '') return '';
+    if (strlen($d) === 10 || strlen($d) === 11) $d = '55' . $d;   // DDD + número, sem o 55
+    return (strlen($d) >= 12 && strlen($d) <= 13) ? $d : '';
+}
+function url_publica(): string {
+    $u = (string)opt('url_publica', '');
+    if ($u !== '') return rtrim($u, '/');
+    $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    return ($https ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(cfg('base_url'), '/');
+}
+/** Link wa.me com mensagem genérica, sem citar tarefa. $tipo: 'validar' (tem coisa pronta para validar) ou 'novidade'. */
+function wa_link(array $pessoa, string $tipo = 'novidade'): string {
+    $n = celular_wa($pessoa['celular'] ?? '');
+    if ($n === '') return '';
+    $link = url_publica() . '/';
+    $msg = $tipo === 'validar'
+        ? 'Oi ' . primeiro_nome((string)$pessoa['nome']) . '! Tem coisa pronta no painel esperando a sua validação. ' . $link
+        : 'Oi ' . primeiro_nome((string)$pessoa['nome']) . '! Tem novidade no painel para você. ' . $link;
+    return 'https://wa.me/' . $n . '?text=' . rawurlencode($msg);
+}
+/** Botões "Avisar <nome> no WhatsApp" para as pessoas do cliente na lista. Só para o admin. */
+function wa_avisos_html(array $pessoas, string $tipo): string {
+    $h = ''; $sem = [];
+    foreach ($pessoas as $p) {
+        if (($p['lado'] ?? '') !== 'cliente') continue;
+        $l = wa_link($p, $tipo);
+        if ($l === '') { $sem[] = primeiro_nome((string)$p['nome']); continue; }
+        $h .= '<a class="btn wa" href="' . e($l) . '" target="_blank" rel="noopener">Avisar ' . e(primeiro_nome((string)$p['nome'])) . ' no WhatsApp</a> ';
+    }
+    if ($sem) $h .= '<span class="sm muted">Sem celular cadastrado: ' . e(implode(', ', $sem)) . ' (Admin → Pessoas).</span>';
+    return $h;
+}
+
+/** Botões de status de uma tarefa (usado no cartão e na página da tarefa). Depende de quem olha, do status e do tipo. */
+function botoes_status(array $t, array $eu, string $hid, string $idp, bool $compacto = false): string {
+    $act = e(url('acao.php'));
+    $novos = recursos_novos();
+    $admin = !empty($eu['is_admin']);
+    $form = fn(string $acao, string $rot, string $cls) => '<form method="post" action="' . $act . '" class="inline">' . csrf_campo() . $hid . '<input type="hidden" name="acao" value="' . $acao . '"><button class="btn ' . $cls . '" type="submit">' . $rot . '</button></form>';
+    $com_texto = fn(string $acao, string $sum, string $label, string $btn, string $cls, string $ph = '') => '<details class="mini"><summary class="btn ' . $cls . '">' . $sum . '</summary><form method="post" action="' . $act . '">' . csrf_campo() . $hid . '<input type="hidden" name="acao" value="' . $acao . '"><label for="' . $idp . $acao . '">' . $label . '</label><textarea id="' . $idp . $acao . '" name="texto" required placeholder="' . e($ph) . '"></textarea><button class="btn ' . $cls . '" type="submit" style="margin-top:8px">' . $btn . '</button></form></details>';
+    $tipo = (string)($t['tipo'] ?? 'tarefa');
+    $h = '';
+    if ($t['status'] === 'feito') return $h;
+    if ($t['status'] === 'validacao') {
+        $h .= $form('validar', '✓ ' . e(VALIDAR_ROTULO[$tipo] ?? 'Validar'), 'feita') . ajuda('validar');
+        $h .= $com_texto('devolver', 'Ainda não', 'O que falta ou não ficou bom?', 'Devolver para ' . e(gestor()), 'warn', 'Ex.: o botão continua sem responder no celular');
+    } else {
+        $pedirValidacao = $novos && ($eu['lado'] ?? '') !== 'cliente' && tem_validador($t);
+        if ($pedirValidacao) {
+            $h .= $form('validacao', '✓ Pronta para validar', 'feita') . ajuda('pronta_validar');
+            if (!$compacto) $h .= $form('feito', 'Concluir sem validar', 'sec mini');
+        } else {
+            $h .= $form('feito', '✓ Concluir', 'feita') . ajuda('feita');
+        }
+        if ($t['status'] !== 'travado') $h .= $com_texto('travado', 'Travou?', 'O que está impedindo? ' . ajuda('travou'), 'Avisar o ' . e(gestor()), 'warn', 'Ex.: ainda não recebi as fotos');
+    }
+    if ($admin && $novos && !$compacto) { // no quadro (cartão compacto) o Ignorar fica só na página da tarefa
+        $rotIgn = $tipo === 'tarefa' ? 'Ignorar' : 'Ignorar ' . mb_strtolower(TIPOS[$tipo] ?? '');
+        $h .= $com_texto('ignorar', e($rotIgn), 'Por que vamos ignorar? O cliente vê este motivo.', 'Ignorar e fechar', 'sec', 'Ex.: comportamento esperado; já funciona assim por projeto');
+    }
+    return '<div class="acoes">' . $h . '</div>';
 }
 
 /* ---------- Equipe da tarefa: o responsável (tarefas.responsavel_id) + quem também participa (tarefa_pessoas, migration 006) ---------- */
@@ -428,7 +532,7 @@ function topo(string $titulo, string $ativo = '', bool $menu = true): void {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="' . e(url('assets/painel.css')) . '?v=13">
-<link rel="stylesheet" href="' . e(url('assets/painel-v2.css')) . '?v=8">
+<link rel="stylesheet" href="' . e(url('assets/painel-v2.css')) . '?v=9">
 <style>:root{--primary:' . e($cor['primary']) . ';--primary-2:' . e($cor['primary2']) . ';--gold:' . e($cor['destaque']) . ';--primary-soft:color-mix(in srgb,' . e($cor['primary']) . ' 10%,#fff);--surf-low:color-mix(in srgb,' . e($cor['primary']) . ' 6%,#fff);--surf-hi:color-mix(in srgb,' . e($cor['primary']) . ' 12%,#fff);--bg:color-mix(in srgb,' . e($cor['primary']) . ' 8%,#eceef1)}</style>
 </head><body>
 <a class="skip" href="#conteudo">Ir para o conteúdo</a>

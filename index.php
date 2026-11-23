@@ -31,8 +31,8 @@ function cartao_tarefa(array $t, array $eu, bool $mostraResp, string $volta, boo
     if ($mostraResp) echo '<span class="resp">' . equipe_html($t) . '</span><span>·</span>';
     elseif (!empty($t['participantes'])) echo '<span class="resp">Com ' . e(equipe_texto($t, (int)$eu['id'])) . '</span><span>·</span>';
     if (!$semPrazo) echo '<span>Prazo ' . e(dt($t['prazo'])) . '</span>';
-    if ($t['status'] === 'travado') echo '<span class="badge travado">Travou</span>';
-    if ($t['status'] === 'fazendo') echo '<span class="badge fazendo">Fazendo</span>';
+    echo tipo_badge($t);
+    if (in_array($t['status'], ['travado', 'fazendo', 'validacao'], true)) echo '<span class="badge ' . e($t['status']) . '">' . e(STATUS[$t['status']]) . '</span>';
     echo bola_badge($t);
     echo '</div>';
     if (!$compacto && $t['descricao']) echo '<p class="sm">' . e($t['descricao']) . '</p>';
@@ -42,24 +42,12 @@ function cartao_tarefa(array $t, array $eu, bool $mostraResp, string $volta, boo
         if ((int)$t['n_hist'] > 0) echo '<a class="chip" href="' . e(url('tarefa.php?id=' . $t['id'])) . '">Histórico <b>(' . (int)$t['n_hist'] . ')</b></a>';
         echo '</div>';
     }
-    if ($meu && $t['status'] !== 'feito') {
-        echo '<div class="acoes">
-        <form method="post" action="' . e(url('acao.php')) . '" class="inline">' . csrf_campo() . $hid . '<input type="hidden" name="acao" value="feito">
-          <button class="btn feita" type="submit">✓ Feita</button></form>' . ajuda('feita');
-        if ($t['status'] !== 'travado') {
-            echo '<details class="mini"><summary class="btn warn">Travou?</summary>
-              <form method="post" action="' . e(url('acao.php')) . '">' . csrf_campo() . $hid . '<input type="hidden" name="acao" value="travado">
-              <label for="tr' . (int)$t['id'] . '">O que está impedindo? ' . ajuda('travou') . '</label>
-              <textarea id="tr' . (int)$t['id'] . '" name="texto" required placeholder="Ex.: ainda não recebi as fotos"></textarea>
-              <button class="btn warn" type="submit" style="margin-top:8px">Avisar o ' . gestor() . '</button></form></details>';
-        }
-        echo '</div>';
-    }
+    if ($meu && $t['status'] !== 'feito') echo botoes_status($t, $eu, $hid, 'c' . (int)$t['id'], $compacto);
     echo '</article>';
 }
 
 function linha_feita(array $t, bool $mostraResp): void {
-    echo '<article class="card tarefa feita-linha" style="padding:12px 16px"><div class="meta" style="margin:0"><span class="badge feito">Feita</span><a href="' . e(url('tarefa.php?id=' . $t['id'])) . '">' . e($t['titulo']) . '</a>' . ($mostraResp ? '<span>· ' . e(equipe_texto($t)) . '</span>' : '') . '</div></article>';
+    echo '<article class="card tarefa feita-linha" style="padding:12px 16px"><div class="meta" style="margin:0"><span class="badge feito">' . e(status_rotulo($t)) . '</span>' . tipo_badge($t) . '<a href="' . e(url('tarefa.php?id=' . $t['id'])) . '">' . e($t['titulo']) . '</a>' . ($mostraResp ? '<span>· ' . e(equipe_texto($t)) . '</span>' : '') . '</div></article>';
 }
 
 topo('Para mim', 'index');
@@ -116,18 +104,20 @@ if (!$abertas && $modo !== 'quadro') {
 /* ---------- QUADRO: três colunas, em palavras simples ---------- */
 if ($modo === 'quadro') {
     /* Quatro colunas. Cada cartão pode ser arrastado de uma coluna para outra (mover.php grava). */
-    $col = ['a_fazer' => [], 'fazendo' => [], 'travado' => [], 'feito' => $feitas];
+    $novos = recursos_novos();
+    $col = ['a_fazer' => [], 'fazendo' => [], 'validacao' => [], 'travado' => [], 'feito' => $feitas];
     foreach ($abertas as $t) {
-        $k = in_array($t['status'], ['fazendo', 'travado'], true) ? $t['status'] : 'a_fazer';
+        $k = in_array($t['status'], ['fazendo', 'travado', 'validacao'], true) ? $t['status'] : 'a_fazer';
         $col[$k][] = $t;
     }
     $defs = [
-        ['a_fazer', 'A fazer', 'c-fazer', 'Nada por aqui. Tudo em dia.'],
-        ['fazendo', 'Fazendo', 'c-fazendo', 'Arraste uma tarefa para cá quando começar.'],
-        ['travado', 'Travou', 'c-travado', 'Nenhuma tarefa travada.'],
-        ['feito', 'Feitas', 'c-feito', 'Quando uma tarefa for concluída, ela aparece aqui.'],
+        ['a_fazer', 'Aberto', 'c-fazer', 'Nada por aqui. Tudo em dia.'],
+        ['fazendo', 'Em execução', 'c-fazendo', 'Arraste um item para cá quando começar.'],
     ];
-    echo '<div class="quadro kb" data-mover="' . e(url('mover.php')) . '" data-csrf="' . e(csrf()) . '">';
+    if ($novos) $defs[] = ['validacao', 'Em validação', 'c-validacao', 'Nada esperando validação.'];
+    $defs[] = ['travado', 'Travou', 'c-travado', 'Nenhuma tarefa travada.'];
+    $defs[] = ['feito', 'Concluídos', 'c-feito', 'Quando algo for concluído, aparece aqui.'];
+    echo '<div class="quadro kb' . ($novos ? ' kb5' : '') . '" data-mover="' . e(url('mover.php')) . '" data-csrf="' . e(csrf()) . '">';
     foreach ($defs as [$k, $nome, $cl, $vazio]) {
         echo '<section class="coluna ' . $cl . '" aria-label="' . e($nome) . '"><div class="coluna-cab"><h2>' . e($nome) . '</h2><span class="conta">' . count($col[$k]) . '</span></div>';
         echo '<div class="kb-corpo" data-st="' . $k . '"><div class="vazio-mini kb-vazio"' . ($col[$k] ? ' hidden' : '') . '>' . e($vazio) . '</div>';
@@ -153,7 +143,7 @@ if ($modo === 'quadro') {
        . 'var fd=new FormData();fd.append("_csrf",TOK);fd.append("tarefa_id",item.dataset.id);fd.append("status",destino);fd.append("texto",motivo||"");'
        . 'fetch(URL_,{method:"POST",body:fd,credentials:"same-origin"}).then(function(r){return r.json().catch(function(){return{ok:false,msg:"Resposta inesperada do servidor."}})}).then(function(j){'
        . 'if(!j.ok){origem.appendChild(item);item.dataset.st=antes;conta();aviso(j.msg||"Não foi possível mover.");return;}'
-       . 'if(antes==="feito"||destino==="feito"||destino==="travado"||antes==="travado"){location.reload();}else{aviso("Movida.");}'
+       . 'if(antes==="feito"||destino==="feito"||destino==="travado"||antes==="travado"||destino==="validacao"||antes==="validacao"){location.reload();}else{aviso("Movida.");}'
        . '}).catch(function(){origem.appendChild(item);item.dataset.st=antes;conta();aviso("Sem conexão. A tarefa voltou para onde estava.");});}'
        . 'K.addEventListener("dragstart",function(e){var it=e.target.closest&&e.target.closest(".kb-item.movivel");if(!it)return;arrasta=it;setTimeout(function(){it.classList.add("arrastando")},0);e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",it.dataset.id);});'
        . 'K.addEventListener("dragend",function(){if(arrasta)arrasta.classList.remove("arrastando");arrasta=null;K.querySelectorAll(".kb-corpo.sobre").forEach(function(c){c.classList.remove("sobre")});});'
@@ -270,6 +260,20 @@ else {
     $lateral .= '<section class="bloco"><div class="sec-cab"><h2>Atalhos</h2></div>' . $at . '</section>';
 
     echo '<div class="home-grade"><div>';
+    $paraValidar = [];
+    if (recursos_novos() && ($eu['lado'] ?? '') === 'cliente') { // o cliente vê primeiro o que está esperando a validação dele
+        foreach ($abertas as $i => $t) if ($t['status'] === 'validacao' && pode_agir($t, $eu)) { $paraValidar[] = $t; unset($abertas[$i]); }
+    }
+    if ($paraValidar) {
+        echo '<h2 class="sec-validar">Esperando sua validação (' . count($paraValidar) . ') ' . ajuda('validar') . '</h2><div class="lista-tarefas">';
+        foreach ($paraValidar as $t) cartao_tarefa($t, $eu, false, $volta);
+        echo '</div>';
+    }
+    if (!empty($eu['is_admin']) && recursos_novos() && equipe_ativa() && $todas) { // o admin vê quem precisa ser avisado
+        $qv = $pdo->query("SELECT DISTINCT p.id, p.nome, p.lado, p.celular FROM pessoas p WHERE p.ativo = 1 AND p.lado = 'cliente' AND (p.id IN (SELECT t.responsavel_id FROM tarefas t WHERE t.status = 'validacao') OR p.id IN (SELECT tp.pessoa_id FROM tarefa_pessoas tp JOIN tarefas t ON t.id = tp.tarefa_id WHERE t.status = 'validacao'))");
+        $aval = $qv->fetchAll();
+        if ($aval) echo '<div class="card aviso-zap"><strong>Há itens em validação.</strong> ' . wa_avisos_html($aval, 'validar') . '</div>';
+    }
     if ($abertas && !$todas) {
         $iH = null;
         foreach ($abertas as $i => $t) { if ($t['status'] !== 'travado') { $iH = $i; break; } }

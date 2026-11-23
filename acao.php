@@ -24,7 +24,31 @@ switch ($acao) {
     case 'feito':
         if (!$pode) break;
         mudar_status($id, (int)$eu['id'], 'feito', $texto);
-        aviso('Marcada como feita. Obrigado!'); break;
+        aviso('Concluída. Obrigado!'); break;
+    case 'validacao': // o gestor entrega e pede para o cliente conferir
+        if (!$pode) break;
+        if (!recursos_novos()) { aviso('Falta rodar a migration 001 no banco (status Em validação).', 'erro'); break; }
+        $tc = com_equipe([$t + ['responsavel' => '']])[0];
+        if (!tem_validador($tc)) { mudar_status($id, (int)$eu['id'], 'feito', $texto); aviso('Ninguém do cliente participa desta tarefa, então foi concluída direto.'); break; }
+        mudar_status($id, (int)$eu['id'], 'validacao', $texto);
+        aviso('Enviada para validação. Agora é a vez de ' . cliente_curto() . '. Use o botão de WhatsApp para avisar.'); break;
+    case 'validar':
+        if (!$pode) break;
+        if ($t['status'] !== 'validacao') { aviso('Este item não está em validação.', 'erro'); break; }
+        mudar_status($id, (int)$eu['id'], 'feito', $texto, 'validou e concluiu');
+        aviso('Validado e concluído. Obrigado!'); break;
+    case 'devolver':
+        if (!$pode) break;
+        if ($t['status'] !== 'validacao') { aviso('Este item não está em validação.', 'erro'); break; }
+        if ($texto === '') { aviso('Conte o que falta ou não ficou bom, para o ' . gestor() . ' conseguir ajustar.', 'erro'); break; }
+        mudar_status($id, (int)$eu['id'], 'a_fazer', $texto, 'devolveu para ajuste');
+        aviso('Devolvido. O ' . gestor() . ' vai ver o seu motivo.'); break;
+    case 'ignorar':
+        if (empty($eu['is_admin'])) { aviso('Só o admin pode ignorar um item.', 'erro'); break; }
+        if (!recursos_novos()) { aviso('Falta rodar a migration 001 no banco.', 'erro'); break; }
+        if ($texto === '') { aviso('Escreva o motivo: o cliente vai ler.', 'erro'); break; }
+        ignorar_tarefa($id, (int)$eu['id'], $texto);
+        aviso('Fechado como ignorado, com o motivo no histórico.'); break;
     case 'travado':
         if (!$pode) break;
         if ($texto === '') { aviso('Conte o que está impedindo, para o ' . gestor() . ' conseguir ajudar.', 'erro'); break; }

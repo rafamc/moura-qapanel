@@ -10,7 +10,7 @@ INSERT INTO paginas (slug, secao, titulo, conteudo, ordem) VALUES ('como-usar', 
 '## Em 4 passos
 
 - **1. Veja o que é seu.** A primeira tela mostra só as tarefas que ficaram com você, com a data combinada.
-- **2. Terminou? Toque em "Feita".** Se algo impediu você de continuar, toque em "Travou?" e conte o motivo. A gestão do projeto recebe o aviso e ajuda.
+- **2. Terminou? Toque em "Concluir".** Se algo impediu você de continuar, toque em "Travou?" e conte o motivo. A gestão do projeto recebe o aviso e ajuda. Quando a gestão entregar algo para você conferir, o item aparece em "Esperando sua validação": confirme, ou toque em "Ainda não" e conte o que falta.
 - **3. Precisa lembrar o que foi combinado?** Abra "Decidido". Tudo o que foi resolvido nas reuniões fica lá, com a data.
 - **4. Achou um problema?** Abra "Relatar problema", descreva e cole um print com Ctrl+V.
 
@@ -19,7 +19,7 @@ INSERT INTO paginas (slug, secao, titulo, conteudo, ordem) VALUES ('como-usar', 
 Na tela "Para mim", escolha como quer ver:
 
 - **Lista:** uma tarefa embaixo da outra, com a data combinada.
-- **Quadro:** colunas por situação (A fazer, Fazendo, Travou e Feitas). Arraste a tarefa de uma coluna para outra conforme avança.
+- **Quadro:** colunas por situação (Aberto, Em execução, Em validação, Travou e Concluídos). Arraste a tarefa de uma coluna para outra conforme avança.
 - **Agenda:** o calendário do mês. Toque numa tarefa para ver os detalhes.
 
 "Minhas" mostra só o que é seu. "Todas" mostra o projeto inteiro.

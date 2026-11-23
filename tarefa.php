@@ -22,21 +22,21 @@ echo '<div class="duas"><div>';
 echo '<div class="card"><div class="cab"><h1>' . e($t['titulo']) . '</h1>' . ajuda('tarefa') . '</div>';
 echo '<div class="meta"><span class="resp">' . ($t['participantes'] ? 'Responsáveis: ' : 'Responsável: ') . equipe_html($t, true) . ($t['participantes'] ? ' ' . ajuda('equipe') : '') . '</span><span>·</span><span>Prazo ' . e(dt($t['prazo'])) . ' ' . ajuda('prazo') . '</span>';
 if ($rot) echo '<span class="badge ' . e($cls) . '">' . e($rot) . '</span>';
-echo '<span class="badge ' . e($t['status']) . '">' . e(STATUS[$t['status']]) . '</span>' . bola_badge($t) . '</div>';
+echo tipo_badge($t) . '<span class="badge ' . e($t['status']) . '">' . e(status_rotulo($t)) . '</span>' . bola_badge($t) . '</div>';
 if ($t['descricao']) echo '<p>' . nl2br(e($t['descricao'])) . '</p>';
 if ($t['reuniao_titulo']) echo '<p class="sm muted">Combinada em: ' . e($t['reuniao_titulo']) . '</p>';
 
 if ($meu) {
-    echo '<div class="acoes">';
     if ($t['status'] === 'feito') {
-        echo '<form method="post" action="' . $act . '">' . csrf_campo() . $hid . '<input type="hidden" name="acao" value="reabrir"><button class="btn sec" type="submit">Reabrir</button></form>';
+        echo '<div class="acoes"><form method="post" action="' . $act . '">' . csrf_campo() . $hid . '<input type="hidden" name="acao" value="reabrir"><button class="btn sec" type="submit">Reabrir</button></form></div>';
     } else {
-        echo '<form method="post" action="' . $act . '" class="inline">' . csrf_campo() . $hid . '<input type="hidden" name="acao" value="feito"><button class="btn feita" type="submit">✓ Feita</button></form>' . ajuda('feita');
-        if ($t['status'] !== 'travado') {
-            echo '<details class="mini"><summary class="btn warn">Travou?</summary><form method="post" action="' . $act . '">' . csrf_campo() . $hid . '<input type="hidden" name="acao" value="travado"><label for="trt">O que está impedindo? ' . ajuda('travou') . '</label><textarea id="trt" name="texto" required></textarea><button class="btn warn" type="submit" style="margin-top:8px">Avisar o ' . gestor() . '</button></form></details>';
-        }
+        echo botoes_status($t, $eu, $hid, 't');
     }
-    echo '</div>';
+}
+if (!empty($eu['is_admin']) && recursos_novos() && $t['status'] !== 'feito') { // avisar o cliente por WhatsApp (mensagem genérica, sem nome de tarefa)
+    $cli = []; foreach (equipe_lista($t) as $x) { $q = $pdo->prepare('SELECT id, nome, lado, celular FROM pessoas WHERE id = ? AND ativo = 1'); $q->execute([$x['id']]); if ($r = $q->fetch()) $cli[] = $r; }
+    $zap = wa_avisos_html($cli, $t['status'] === 'validacao' ? 'validar' : 'novidade');
+    if ($zap) echo '<div class="acoes aviso-zap">' . $zap . '</div>';
 }
 echo '</div>';
 $anx = anexos_da_tarefa((int)$t['id']);

@@ -38,6 +38,7 @@ return [
     ],
 
     // Relatos do cliente: em quantos dias a gestão responde (prazo da tarefa criada). Padrão 3.
+    'url_publica' => '', // opcional: endereço do painel usado no WhatsApp (ex.: https://engnear.rafaelmoura.net)
     'relato_prazo_dias' => 3,
 
     // Transparência: aparece no rodapé enquanto o módulo "engajamento" estiver ligado. Combine o mesmo texto no contrato.

@@ -32,6 +32,11 @@ if ($v === 'tarefas') {
     echo '<div class="adm-split"><div class="adm-form">';
     echo '<div class="card"><h2>' . ($ed ? 'Editar tarefa' : 'Nova tarefa') . '</h2><form method="post" enctype="multipart/form-data">' . ($ed ? $H('tarefa_editar', ['id' => $ed['id'], 'f' => $f]) : $H('tarefa_nova', ['f' => $f]));
     echo '<label>Título</label><input type="text" name="titulo" required value="' . e($ed['titulo'] ?? '') . '">';
+    if (recursos_novos()) {
+        echo '<label>Tipo ' . ajuda('adm_tipo') . '</label><select name="tipo">';
+        foreach (TIPOS as $k => $n) echo '<option value="' . $k . '"' . (($ed['tipo'] ?? 'tarefa') === $k ? ' selected' : '') . '>' . e($n) . '</option>';
+        echo '</select>';
+    }
     echo '<label>Detalhe (opcional)</label><textarea name="descricao">' . e($ed['descricao'] ?? '') . '</textarea>';
     echo '<div class="grid2"><div><label>Responsável ' . ajuda('adm_resp') . '</label><select name="responsavel_id" required>' . $optPessoas($ed['responsavel_id'] ?? 0) . '</select></div>';
     echo '<div><label>Prazo ' . ajuda('adm_prazo') . '</label><input type="date" name="prazo" required value="' . e($ed['prazo'] ?? '') . '"></div></div>';
@@ -46,7 +51,11 @@ if ($v === 'tarefas') {
     }
     if (modulo('reunioes')) echo '<label>Reunião de origem</label><select name="reuniao_id">' . $optReunioes($ed['reuniao_id'] ?? 0) . '</select>';
     echo '<label>A vez é de (opcional) ' . ajuda('adm_bola') . '</label><select name="bola"><option value="">Automático (lado do responsável)</option><option value="cliente"' . (($ed['bola_com'] ?? '') === 'cliente' ? ' selected' : '') . '>' . e(cliente_curto()) . '</option><option value="moura"' . (($ed['bola_com'] ?? '') === 'moura' ? ' selected' : '') . '>' . e(gestor_empresa()) . '</option></select>';
-    if ($ed) echo '<label>Situação</label><select name="situacao"><option value="a_fazer"' . ($ed['status'] === 'a_fazer' ? ' selected' : '') . '>A fazer</option><option value="fazendo"' . ($ed['status'] === 'fazendo' ? ' selected' : '') . '>Fazendo</option><option value="travado"' . ($ed['status'] === 'travado' ? ' selected' : '') . '>Travada</option><option value="feito"' . ($ed['status'] === 'feito' ? ' selected' : '') . '>Concluída</option></select>';
+    if ($ed) {
+        echo '<label>Situação</label><select name="situacao">';
+        foreach (STATUS as $k => $n) { if ($k === 'validacao' && !recursos_novos()) continue; echo '<option value="' . $k . '"' . ($ed['status'] === $k ? ' selected' : '') . '>' . e($n) . '</option>'; }
+        echo '</select>';
+    }
     echo anexos_campo_html();
     echo '<p class="form-acoes"><button class="btn" type="submit">' . ($ed ? 'Salvar' : 'Criar tarefa') . '</button>' . ($ed ? ' <a class="btn sec" href="?v=tarefas&f=' . $f . '">Cancelar</a>' : '') . '</p></form></div>';
     if ($ed) echo '<div class="card"><h2>Arquivos desta tarefa</h2>' . anexos_lista_html(anexos_da_tarefa((int)$ed['id']), $eu, url('admin/?v=tarefas&f=' . $f . '&edit=' . (int)$ed['id'])) . '</div>';
@@ -54,17 +63,20 @@ if ($v === 'tarefas') {
 
     $hoje = date('Y-m-d');
     $rows = com_equipe($pdo->query("SELECT t.*, p.nome, p.nome AS responsavel FROM tarefas t JOIN pessoas p ON p.id = t.responsavel_id ORDER BY t.prazo, t.id")->fetchAll());
-    $cnt = ['abertas' => 0, 'atrasadas' => 0, 'travadas' => 0, 'concluidas' => 0, 'todas' => count($rows)];
+    $cnt = ['abertas' => 0, 'atrasadas' => 0, 'validacao' => 0, 'travadas' => 0, 'concluidas' => 0, 'todas' => count($rows)];
     foreach ($rows as $x) {
         if ($x['status'] === 'feito') { $cnt['concluidas']++; continue; }
         $cnt['abertas']++;
         if ($x['prazo'] < $hoje) $cnt['atrasadas']++;
         if ($x['status'] === 'travado') $cnt['travadas']++;
+        if ($x['status'] === 'validacao') $cnt['validacao']++;
     }
-    $filtros = ['abertas' => 'Em aberto', 'atrasadas' => 'Atrasadas', 'travadas' => 'Travadas', 'concluidas' => 'Concluídas', 'todas' => 'Todas'];
+    $filtros = ['abertas' => 'Em aberto', 'atrasadas' => 'Atrasadas', 'validacao' => 'Em validação', 'travadas' => 'Travadas', 'concluidas' => 'Concluídas', 'todas' => 'Todas'];
+    if (!recursos_novos()) unset($filtros['validacao']);
     $vis = array_values(array_filter($rows, fn($x) => match ($f) {
         'atrasadas' => $x['status'] !== 'feito' && $x['prazo'] < $hoje,
         'travadas' => $x['status'] === 'travado',
+        'validacao' => $x['status'] === 'validacao',
         'concluidas' => $x['status'] === 'feito',
         'todas' => true,
         default => $x['status'] !== 'feito',
@@ -81,8 +93,8 @@ if ($v === 'tarefas') {
             [$rot, $cls] = prazo_info($x['prazo'], $x['status']);
             $feita = $x['status'] === 'feito';
             $btn = '<form method="post" class="inline">' . $H('tarefa_status', ['id' => $x['id'], 'novo' => $feita ? 'a_fazer' : 'feito', 'f' => $f]) . '<button class="btn' . ($feita ? ' sec' : '') . ' mini" type="submit">' . ($feita ? 'Reabrir' : 'Concluir') . '</button></form>';
-            echo '<tr><td><a href="' . e(url('tarefa.php?id=' . $x['id'])) . '">' . e($x['titulo']) . '</a></td><td>' . e(equipe_texto($x)) . '</td><td>' . e(dt($x['prazo'])) . ($rot ? '<br><span class="badge ' . e($cls) . '">' . e($rot) . '</span>' : '') . '</td>'
-               . '<td><span class="badge ' . e($x['status']) . '">' . ($feita ? 'Concluída' : e(STATUS[$x['status']])) . '</span>' . ($feita && $x['concluida_em'] ? '<br><span class="sm muted">em ' . e(dt(substr($x['concluida_em'], 0, 10))) . '</span>' : '') . '<div style="margin-top:6px">' . $btn . '</div></td>'
+            echo '<tr><td>' . tipo_badge($x) . ' <a href="' . e(url('tarefa.php?id=' . $x['id'])) . '">' . e($x['titulo']) . '</a></td><td>' . e(equipe_texto($x)) . '</td><td>' . e(dt($x['prazo'])) . ($rot ? '<br><span class="badge ' . e($cls) . '">' . e($rot) . '</span>' : '') . '</td>'
+               . '<td><span class="badge ' . e($x['status']) . '">' . e(status_rotulo($x)) . '</span>' . ($feita && $x['concluida_em'] ? '<br><span class="sm muted">em ' . e(dt(substr($x['concluida_em'], 0, 10))) . '</span>' : '') . '<div style="margin-top:6px">' . $btn . '</div></td>'
                . '<td style="white-space:nowrap"><a class="btn sec mini" href="?v=tarefas&f=' . $f . '&edit=' . $x['id'] . '">Editar</a> ' . $apagar('tarefa_apagar', (int)$x['id']) . '</td></tr>';
         }
         echo '</table></div>';
@@ -148,7 +160,7 @@ if ($v === 'pessoas') {
         $z = $_SESSION['zap']; unset($_SESSION['zap']);
         echo '<div class="card"><h2>Mensagem para ' . e($z['nome']) . '</h2><textarea readonly rows="8" class="mono" onclick="this.select()">' . e($z['texto']) . '</textarea><p style="margin-top:10px"><button class="btn" type="button" data-copiar="' . e($z['texto']) . '">Copiar mensagem</button></p><p class="sm muted">A senha só aparece agora. Se perder, use Redefinir senha.</p></div>';
     }
-    echo '<div class="card"><h2>Nova pessoa</h2><form method="post">' . $H('pessoa_nova') . '<div class="grid2"><div><label>Nome</label><input type="text" name="nome" required></div><div><label>Papel</label><input type="text" name="papel" placeholder="Ex.: Tesoureira"></div></div><label>E-mail (é o login da pessoa)</label><input type="email" name="email" placeholder="nome@exemplo.com.br" autocapitalize="none"><label>Senha inicial (mínimo 4)</label><input type="text" name="senha" value="1234" autocomplete="off"><label>Lado</label><select name="lado"><option value="cliente">' . e(cliente_curto()) . '</option><option value="moura">Moura Digital</option></select><p class="form-acoes"><button class="btn" type="submit">Criar pessoa</button></p></form></div>';
+    echo '<div class="card"><h2>Nova pessoa</h2><form method="post">' . $H('pessoa_nova') . '<div class="grid2"><div><label>Nome</label><input type="text" name="nome" required></div><div><label>Papel</label><input type="text" name="papel" placeholder="Ex.: Tesoureira"></div></div><label>E-mail (é o login da pessoa)</label><input type="email" name="email" placeholder="nome@exemplo.com.br" autocapitalize="none">' . (recursos_novos() ? '<label>Celular (WhatsApp, com DDD) <span class="opc">opcional</span></label><input type="text" name="celular" inputmode="tel" placeholder="48 99999-9999">' : '') . '<label>Senha inicial (mínimo 4)</label><input type="text" name="senha" value="1234" autocomplete="off"><label>Lado</label><select name="lado"><option value="cliente">' . e(cliente_curto()) . '</option><option value="moura">Moura Digital</option></select><p class="form-acoes"><button class="btn" type="submit">Criar pessoa</button></p></form></div>';
     echo '</div><div class="adm-lista">';
     foreach ($pdo->query('SELECT * FROM pessoas ORDER BY ativo DESC, lado DESC, nome') as $p) {
         $link = $esquema . url('?t=' . $p['token']);
@@ -162,7 +174,7 @@ if ($v === 'pessoas') {
         echo '<button class="btn sec mini" type="button" data-copiar="' . e($link) . '">Copiar link</button>';
         echo '<form method="post" class="inline" onsubmit="return confirm(\'O link antigo vai parar de funcionar. Continuar?\')">' . $H('pessoa_novo_link', ['id' => $p['id']]) . '<button class="btn warn mini">Gerar novo link</button></form>';
         echo '<form method="post" class="inline">' . $H('pessoa_ativo', ['id' => $p['id']]) . '<button class="btn ' . ($p['ativo'] ? 'perigo' : 'sec') . ' mini">' . ($p['ativo'] ? 'Desativar' : 'Reativar') . '</button></form></div>';
-        echo '<details class="mini" style="margin-top:10px"><summary class="btn sec mini">Editar dados</summary><form method="post">' . $H('pessoa_editar', ['id' => $p['id']]) . '<div class="grid2"><div><label>Nome</label><input type="text" name="nome" value="' . e($p['nome']) . '"></div><div><label>Papel</label><input type="text" name="papel" value="' . e($p['papel']) . '"></div></div><label>E-mail (login)</label><input type="email" name="email" value="' . e((string)$p['email']) . '" autocapitalize="none"><button class="btn mini" style="margin-top:8px">Salvar</button></form></details></div>';
+        echo '<details class="mini" style="margin-top:10px"><summary class="btn sec mini">Editar dados</summary><form method="post">' . $H('pessoa_editar', ['id' => $p['id']]) . '<div class="grid2"><div><label>Nome</label><input type="text" name="nome" value="' . e($p['nome']) . '"></div><div><label>Papel</label><input type="text" name="papel" value="' . e($p['papel']) . '"></div></div><label>E-mail (login)</label><input type="email" name="email" value="' . e((string)$p['email']) . '" autocapitalize="none">' . (recursos_novos() ? '<label>Celular (WhatsApp, com DDD)</label><input type="text" name="celular" inputmode="tel" value="' . e((string)($p['celular'] ?? '')) . '">' : '') . '<button class="btn mini" style="margin-top:8px">Salvar</button></form></details></div>';
     }
     echo '</div></div>';
 }

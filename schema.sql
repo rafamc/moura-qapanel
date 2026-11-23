@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS pessoas (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nome VARCHAR(120) NOT NULL,
   email VARCHAR(190) NULL UNIQUE,
+  celular VARCHAR(20) NULL,
   senha_hash VARCHAR(255) NULL,
   senha_provisoria TINYINT(1) NOT NULL DEFAULT 0,
   falhas TINYINT UNSIGNED NOT NULL DEFAULT 0,
@@ -30,10 +31,12 @@ CREATE TABLE IF NOT EXISTS reunioes (
 CREATE TABLE IF NOT EXISTS tarefas (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   titulo VARCHAR(250) NOT NULL,
+  tipo ENUM('tarefa','bug','sugestao','duvida','ajuste') NOT NULL DEFAULT 'tarefa',
   descricao TEXT NULL,
   responsavel_id INT UNSIGNED NOT NULL,
   prazo DATE NOT NULL,
-  status ENUM('a_fazer','fazendo','travado','feito') NOT NULL DEFAULT 'a_fazer',
+  status ENUM('a_fazer','fazendo','travado','feito','validacao') NOT NULL DEFAULT 'a_fazer',
+  resultado ENUM('ignorado') NULL,                 -- feita sem fazer: o gestor decidiu ignorar (bug que não é bug, sugestão recusada)
   bola_com ENUM('cliente','moura') NULL,          -- de quem é a vez (NULL = feita)
   bola_desde DATETIME NULL,
   reuniao_id INT UNSIGNED NULL,

@@ -8,7 +8,7 @@ require __DIR__ . '/../inc/importar.php';
  *   GET  api/index.php?r=estado            -> tudo (pessoas, tarefas+histórico, decisões, reuniões, páginas)
  *   POST api/index.php?r=importar[&dry=1]  -> corpo JSON no formato do importador (dry=1 só valida)
  *   POST api/index.php?r=comentario        -> {"tarefa_id":1,"texto":"..."}   (autor: 1º admin)
- *   POST api/index.php?r=status            -> {"tarefa_id":1,"status":"feito|travado|a_fazer","nota":""}
+ *   POST api/index.php?r=status            -> {"tarefa_id":1,"status":"feito|travado|a_fazer|fazendo|validacao","nota":""}
  */
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -76,7 +76,7 @@ switch ($rota) {
         if ($metodo !== 'POST') resp(405, ['erro' => 'use POST']);
         $id = (int)($corpo['tarefa_id'] ?? 0); $novo = (string)($corpo['status'] ?? '');
         $ok = $pdo->prepare('SELECT 1 FROM tarefas WHERE id = ?'); $ok->execute([$id]);
-        if (!$ok->fetchColumn() || !isset(STATUS[$novo])) resp(422, ['erro' => 'tarefa_id ou status inválido']);
+        if (!$ok->fetchColumn() || !isset(STATUS[$novo]) || ($novo === 'validacao' && !recursos_novos())) resp(422, ['erro' => 'tarefa_id ou status inválido']);
         mudar_status($id, $admin, $novo, trim((string)($corpo['nota'] ?? '')));
         resp(200, ['ok' => true]);
 

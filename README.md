@@ -29,6 +29,15 @@ Com `engajamento` ligado, o rodapé mostra o aviso de registro (`aviso_registro`
 - Endpoint de números agregados e anônimos para comparar clientes (desenhado, não construído).
 - Cada instalação é independente: correção de bug precisa ser aplicada em cada deploy (mesmo repositório, `git pull`).
 
-## Relatos do cliente (bug, ajuste, dúvida)
+## Situações, tipos e validação
 
-O cliente tem a aba **Relatar problema** (`relatar.php`, módulo `relatos`). Cada relato vira uma tarefa: título com prefixo `[Bug]`, `[Ajuste]` ou `[Dúvida]`, responsável é o primeiro admin ativo, a bola começa com a gestão, e o prazo é de resposta (`relato_prazo_dias`, padrão 3). Quem relatou entra como participante, então acompanha, marca como feita ou reabre se o retesto falhar. Limite de 15 relatos por pessoa por hora. Não exige mudança no banco.
+Situações: **Aberto → Em execução → Em validação → Concluído** (e **Travou**, que passa a vez para o outro lado). Cada item tem um **tipo** (tarefa, bug, sugestão, dúvida, ajuste), que vira etiqueta.
+
+- **Pronta para validar** (gestão): o item vai para "Em validação" e a vez passa para o cliente. Ele vê o bloco "Esperando sua validação" e confirma (o texto do botão muda por tipo: "Confirmo: foi corrigido", "Aprovo", "Entendi, resolvido", "Ficou como pedi") ou devolve com motivo ("Ainda não"). Se ninguém do cliente participa do item, concluir é direto.
+- **Ignorar** (só admin): fecha o item sem fazer, com motivo obrigatório que o cliente lê (bug que não é bug, sugestão recusada). Aparece como "Ignorado".
+- **WhatsApp**: o admin vê o botão "Avisar <nome> no WhatsApp" (link wa.me, ele abre o app e envia). A mensagem é genérica, sem nome de tarefa. Precisa do celular da pessoa (Admin → Pessoas). Opcional: `url_publica` no config se o endereço do painel não for o do acesso atual.
+- **Requer** `migrations/001_validacao_tipo_celular.sql` (rodar no phpMyAdmin antes do deploy). Sem ela o painel segue no modelo antigo, sem erro.
+
+## Relatos do cliente (bug, sugestão, ajuste, dúvida)
+
+O cliente tem a aba **Relatar problema** (`relatar.php`, módulo `relatos`). Cada relato vira uma tarefa com o tipo escolhido (com a migration 001; sem ela, vai no título como `[Bug]`), responsável é o primeiro admin ativo, a bola começa com a gestão, e o prazo é de resposta (`relato_prazo_dias`, padrão 3). Quem relatou entra como participante, então acompanha e valida ou devolve. Limite de 15 relatos por pessoa por hora.
